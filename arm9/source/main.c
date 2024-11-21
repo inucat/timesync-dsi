@@ -20,21 +20,20 @@
  * along with Timesync DSi.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "ntp.h"
 #include "offset.h"
 
 #include <nds.h>
 
 #include <dswifi9.h>
+#include <nds/interrupts.h>
+#include <nds/ndstypes.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <stdint.h>
 #include <stdio.h>
-
-#include "nds/fifocommon.h"
-#include "nds/interrupts.h"
-#include "nds/ndstypes.h"
-#include "nds/system.h"
-#include "ntp.h"
-#include "time.h"
+#include <sys/socket.h>
+#include <time.h>
 
 #define NTP_SERVER "ntp.nict.jp"
 #define FIFO_TO_7  FIFO_USER_01
@@ -54,13 +53,13 @@ print_time_info(time_t time)
 
 static void
 compose_rtctime(RTCtime* rtctime,
-                uint16 year,
-                uint8 mon,
-                uint8 day,
-                uint8 wday,
-                uint8 hour,
-                uint8 min,
-                uint8 sec)
+                uint16_t year,
+                uint8_t mon,
+                uint8_t day,
+                uint8_t wday,
+                uint8_t hour,
+                uint8_t min,
+                uint8_t sec)
 {
     rtctime->year = DEC_TO_BCD(year % 100);
     rtctime->month = DEC_TO_BCD(mon);
@@ -72,7 +71,7 @@ compose_rtctime(RTCtime* rtctime,
 }
 
 static void
-unix_to_rtc(int64 unix_time, RTCtime* rtc_time)
+unix_to_rtc(const time_t unix_time, RTCtime* rtc_time)
 {
     struct tm* tm_data = gmtime(&unix_time);
 
@@ -112,18 +111,18 @@ main(void)
     consoleDemoInit();
     iprintf("= Timesync DSi =\n");
     while (1) {
-        if (fifoCheckDatamsg(FIFO_TO_9)) {
-            fifoGetDatamsg(FIFO_TO_9, sizeof(RTCtime), (uint8*)&rtc_time);
-            printf("RTCTime: %04d-%02d-%02d %d %2d:%02d:%02d\n",
-                   rtc_time.year,
-                   rtc_time.month,
-                   rtc_time.day,
-                   rtc_time.weekday,
-                   rtc_time.hours,
-                   rtc_time.minutes,
-                   rtc_time.seconds);
-            break;
-        }
+        // if (fifoCheckDatamsg(FIFO_TO_9)) {
+        //     fifoGetDatamsg(FIFO_TO_9, sizeof(RTCtime), (uint8*)&rtc_time);
+        //     printf("RTCTime: %04d-%02d-%02d %d %2d:%02d:%02d\n",
+        //            rtc_time.year,
+        //            rtc_time.month,
+        //            rtc_time.day,
+        //            rtc_time.weekday,
+        //            rtc_time.hours,
+        //            rtc_time.minutes,
+        //            rtc_time.seconds);
+        //     break;
+        // }
         swiWaitForVBlank();
     }
 
@@ -169,27 +168,27 @@ main(void)
     }
 
     // Convert the transmit timestamp to Unix time
-    int64 unix_time =
+    uint32_t unix_time =
       ntohl(packet.tx_tm_s) - NTP_TIMESTAMP_DELTA + TIMEZONE_OFFSET;
     print_time_info(unix_time);
     unix_to_rtc(unix_time, &rtc_time);
 
     iprintf("Sending RTCData to ARM7\n");
-    if (!fifoSendDatamsg(FIFO_TO_7, sizeof(RTCtime), (void*)&rtc_time)) {
-        iprintf("fifoSendDatamsg: Failed\n");
-    }
+    // if (!fifoSendDatamsg(FIFO_TO_7, sizeof(RTCtime), (void*)&rtc_time)) {
+    //     iprintf("fifoSendDatamsg: Failed\n");
+    // }
 
 main_loop:
     while (1) {
-        if (fifoCheckValue32(FIFO_TO_9)) {
-            int result = fifoGetValue32(FIFO_TO_9);
-            if (result == 0) {
-                iprintf("Successfully synced!\n");
-            } else {
-                iprintf("Failed to sync!\n");
-            }
-            iprintf("Press START to exit\n");
-        }
+        // if (fifoCheckValue32(FIFO_TO_9)) {
+        //     int result = fifoGetValue32(FIFO_TO_9);
+        //     if (result == 0) {
+        //         iprintf("Successfully synced!\n");
+        //     } else {
+        //         iprintf("Failed to sync!\n");
+        //     }
+        //     iprintf("Press START to exit\n");
+        // }
         swiWaitForVBlank();
 
         int keys = keysDown();

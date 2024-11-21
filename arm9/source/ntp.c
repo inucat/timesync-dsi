@@ -20,24 +20,29 @@
  * along with Timesync DSi.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <netinet/in.h>
-
 #include "ntp.h"
 
-int ntp_request_sync(int sockfd, struct sockaddr *addr) {
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+
+ssize_t
+ntp_request_sync(int sockfd, struct sockaddr* addr)
+{
     struct ntp_packet packet;
     memset(&packet, 0, sizeof(packet));
     packet.li_vn_mode = VN_NTP_V3 | MODE_CLIENT;
 
-    return sendto(sockfd, (char *)&packet, sizeof(packet), 0, addr,
-                  sizeof(struct sockaddr));
+    return sendto(
+      sockfd, (char*)&packet, sizeof(packet), 0, addr, sizeof(struct sockaddr));
 }
 
-int ntp_recv_packet(int sockfd, struct sockaddr *addr,
-                    struct ntp_packet *packet) {
+ssize_t
+ntp_recv_packet(int sockfd, struct sockaddr* addr, struct ntp_packet* packet)
+{
     memset(packet, 0, sizeof(struct ntp_packet));
-    int addr_len = sizeof(struct sockaddr);
+    uint addr_len = sizeof(struct sockaddr);
 
-    return recvfrom(sockfd, packet, sizeof(struct ntp_packet), 0, addr,
-                    &addr_len);
+    return recvfrom(
+      sockfd, packet, sizeof(struct ntp_packet), 0, addr, &addr_len);
 }

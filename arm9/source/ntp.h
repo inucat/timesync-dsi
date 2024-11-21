@@ -23,12 +23,13 @@
 #ifndef _NTP_H_
 #define _NTP_H_
 
-#include <nds.h>
+#include <sys/socket.h>
 
 #define NTP_PORT            123
 #define NTP_TIMESTAMP_DELTA 2208988800ull // 1900 to 1970 in seconds
 
-struct ntp_packet {
+struct ntp_packet
+{
     uint8_t li_vn_mode;
     uint8_t stratum;
     uint8_t poll;
@@ -70,7 +71,8 @@ struct ntp_packet {
  * @param addr Address data of the NTP server.
  * @return Succeeded: >= 0; Failed: < 0
  */
-extern int ntp_request_sync(int sockfd, struct sockaddr *addr);
+extern ssize_t
+ntp_request_sync(int sockfd, struct sockaddr* addr);
 
 /**
  * @brief Receives an NTP packet via `sockfd` from the `addr`.
@@ -80,7 +82,7 @@ extern int ntp_request_sync(int sockfd, struct sockaddr *addr);
  * @param packet Pointer to store received NTP packet.
  * @return Succeeded: >= 0; Failed: < 0
  */
-extern int ntp_recv_packet(int sockfd, struct sockaddr *addr,
-                           struct ntp_packet *packet);
+extern ssize_t
+ntp_recv_packet(int sockfd, struct sockaddr* addr, struct ntp_packet* packet);
 
 #endif // _NTP_H_
