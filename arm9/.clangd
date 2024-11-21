@@ -1,0 +1,4 @@
+CompileFlags:
+    Add: [-Wall, -DARM9, -I./build, -I./include, -I/opt/devkitpro/devkitARM/arm-none-eabi/include/, -I/opt/devkitpro/libnds/include]
+    Remove: -I*
+    Compiler: arm-none-eabi-gcc

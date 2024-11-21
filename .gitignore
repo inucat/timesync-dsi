@@ -1,0 +1,5 @@
+*.elf
+*.nds
+build/
+.DS_Store
+examples/
