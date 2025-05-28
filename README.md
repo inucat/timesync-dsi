@@ -9,9 +9,18 @@ Migration is in progress.
 
 ## Before build, specify your timezone
 
-The clock offset to UTC MUST be specified before building it.
-Open `./arm9/source/offset.h` and change the value shown there.
+**Please change the offset for your timezone BEFORE BUILDING**.
+Open `./arm9/source/offset.h` and change the value.
 
-## Build
+```c
+#define TIMEZONE_OFFSET (9 * 3600) // seconds
+```
 
-Once you set up devkitPro toolchain, run `make` on this directory.
+## How to use
+
+You may need to setup Docker and Docker Compose before building.
+
+1. Clone the repo
+2. In the repo, run `docker compose run make`
+3. Copy `work.nds` to the SD card
+4. Run it on the console

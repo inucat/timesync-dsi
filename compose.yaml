@@ -1,0 +1,7 @@
+services:
+  make:
+    image: devkitpro/devkitarm:20240918
+    volumes: [.:/work]
+    working_dir: /work
+    # command: make
+    entrypoint: make
