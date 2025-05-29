@@ -15,7 +15,7 @@ include $(DEVKITARM)/ds_rules
 # DATA is a list of directories containing data files
 # INCLUDES is a list of directories containing header files
 #---------------------------------------------------------------------------------
-TARGET		:=	$(shell basename $(CURDIR))
+TARGET		:=	$(TARGET)
 BUILD		:=	build
 SOURCES		:=	source2
 DATA		:=	data

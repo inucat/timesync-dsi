@@ -32,7 +32,7 @@ main()
         swiWaitForVBlank();
         scanKeys();
         int pressed = keysDown();
-        int held = keysHeld();
+        // int held = keysHeld();
 
         // STARTボタンで終了
         if (pressed & KEY_START) {
@@ -52,11 +52,11 @@ main()
             offsetMinutes += 60;
         }
 
-        if (held & KEY_A) {
-            iprintf("\e[2;2HA");
-        } else {
-            iprintf("\e[2;2H ");
-        }
+        // if (held & KEY_A) {
+        //     iprintf("\e[2;2HA");
+        // } else {
+        //     iprintf("\e[2;2H ");
+        // }
 
         const char* sign = offsetMinutes >= 0 ? "+" : "-";
         const int hh =

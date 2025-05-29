@@ -20,54 +20,75 @@
  * along with Timesync DSi.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "nds/arm7/clock.h"
-#include "nds/arm7/serial.h"
-#include "nds/fifocommon.h"
-#include "nds/system.h"
-#include <dswifi7.h>
+#include "calico/nds/arm7/rtc.h"
+#include <calico.h>
 #include <nds.h>
-#include <stdbool.h>
-
-
-#define FIFO_TO_7 FIFO_USER_01
-#define FIFO_TO_9 FIFO_USER_02
+// #include <interrupts.h>
+// #include <ndstypes.h>
 
 volatile bool finished = false;
-
-void
-onVblankIrq(void)
-{
-    Wifi_Update();
-}
 
 int
 main()
 {
-    irqInit();
-    fifoInit();
-    installWifiFIFO();
+    // Read settings from NVRAM
+    envReadNvramSettings();
 
-    irqSet(IRQ_VBLANK, onVblankIrq);
+    // // Set up extended keypad server (X/Y/hinge)
+    // keypadStartExtServer();
+
+    // Configure and enable VBlank interrupt
+    lcdSetIrqMask(DISPSTAT_IE_ALL, DISPSTAT_IE_VBLANK);
+    irqEnable(IRQ_VBLANK);
+
+    // Set up RTC
+    rtcInit();
+    rtcSyncTime();
+
+    // Initialize power management
+    pmInit();
+
+    // Set up block device peripherals
+    blkInit();
+
+    // Set up touch screen driver
+    touchInit();
+    touchStartServer(80, MAIN_THREAD_PRIO);
+
+    // // Set up sound and mic driver
+    // soundStartServer(MAIN_THREAD_PRIO - 0x10);
+    // micStartServer(MAIN_THREAD_PRIO - 0x18);
+
+    // Set up wireless manager
+    wlmgrStartServer(MAIN_THREAD_PRIO - 8);
+
+    // fifoInit();
+
+    // irqSet(IRQ_VBLANK, onVblankIrq);
     irqEnable(IRQ_VBLANK | IRQ_VCOUNT | IRQ_NETWORK);
 
-    RTCtime rtc_now;
+    // RTCtime rtc_now;
+    RtcDateTime rtcDateTime = { 0, 0, 0, 0, 0, 0, 0 };
 
-    rtcGetTimeAndDate((uint8*)&rtc_now);
-    fifoSendDatamsg(FIFO_TO_9, sizeof(RTCtime), (uint8*)&rtc_now);
+    // rtcGetTimeAndDate((uint8*)&rtc_now);
+    rtcWriteRegister(RtcReg_DateTime, &rtcDateTime, sizeof(rtcDateTime));
+    // rtcWriteRegister(RtcReg_Time, 0, 0);
 
-    while (true) {
-        if (!finished && fifoCheckDatamsg(FIFO_TO_7)) {
-            finished = true;
+    // fifoSendDatamsg(FIFO_TO_9, sizeof(RTCtime), (uint8*)&rtc_now);
 
-            if ((fifoCheckDatamsgLength(FIFO_TO_7)) != sizeof(RTCtime)) {
-                fifoSendValue32(FIFO_TO_9, -1);
-            }
+    while (pmMainLoop()) {
+        // if (!finished && fifoCheckDatamsg(FIFO_TO_7)) {
+        //     finished = true;
 
-            RTCtime rtc;
-            fifoGetDatamsg(FIFO_TO_7, sizeof(RTCtime), (uint8*)&rtc);
-            rtcSetTimeAndDate((uint8*)&rtc);
-            fifoSendValue32(FIFO_TO_9, 0);
-        }
-        swiWaitForVBlank();
+        //     if ((fifoCheckDatamsgLength(FIFO_TO_7)) != sizeof(RTCtime)) {
+        //         fifoSendValue32(FIFO_TO_9, -1);
+        //     }
+
+        //     RTCtime rtc;
+        //     fifoGetDatamsg(FIFO_TO_7, sizeof(RTCtime), (uint8*)&rtc);
+        //     rtcSetTimeAndDate((uint8*)&rtc);
+        //     fifoSendValue32(FIFO_TO_9, 0);
+        // }
+        threadWaitForVBlank();
     }
 }

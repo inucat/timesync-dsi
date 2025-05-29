@@ -157,7 +157,7 @@ main(void)
     host_addr.sin_port = htons(NTP_PORT);
     memcpy(&host_addr.sin_addr.s_addr, host->h_addr_list[0], host->h_length);
 
-    if (ntp_request_sync(sockfd, (struct sockaddr*)&host_addr) < 0) {
+    if (ntp_make_request_packet(sockfd, (struct sockaddr*)&host_addr) < 0) {
         iprintf("ntp_request_sync: Failed\n");
         goto main_loop;
     }

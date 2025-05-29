@@ -1,12 +1,3 @@
-#include "calico/gba/keypad.h"
-#include "calico/nds/pm.h"
-#include "nds/arm9/background.h"
-#include "nds/arm9/console.h"
-#include "nds/arm9/input.h"
-#include "nds/arm9/sprite.h"
-#include "nds/arm9/video.h"
-#include "nds/interrupts.h"
-#include "nds/system.h"
 #include <nds.h>
 #include <stdio.h>
 #include <string.h>
@@ -67,10 +58,10 @@ main()
     // iprintf("\e[18;0HA   to start sync");
     iprintf("\e[20;0HSTART to quit");
 
-    struct tm renewedTimeStruct = { 0, 0, 0, 1, 0, 2000 - 1900 };
-    const time_t t = mktime(&renewedTimeStruct);
-    const struct timeval timeval = { t, 0 };
-    settimeofday(&timeval, NULL);
+    // struct tm renewedTimeStruct = { 0, 0, 0, 1, 0, 2000 - 1900 };
+    // const time_t t = mktime(&renewedTimeStruct);
+    // const struct timeval timeval = { t, 0 };
+    // settimeofday(&timeval, NULL);
 
     while (pmMainLoop()) {
         swiWaitForVBlank();
