@@ -1,0 +1,13 @@
+CompileFlags:
+  Add:
+    [
+      -Wall,
+      -D__NDS__,
+      -I/opt/devkitpro/calico/include,
+      -I./build,
+      -I./include,
+      -I/opt/devkitpro/devkitARM/arm-none-eabi/include/,
+      -I/opt/devkitpro/libnds/include,
+    ]
+  Remove: -I*
+  Compiler: arm-none-eabi-gcc

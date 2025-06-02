@@ -42,7 +42,7 @@ getDayOfWeek(unsigned day, unsigned month, unsigned year)
 }
 
 int
-main()
+m_ain()
 {
     lcdMainOnBottom();
     videoSetMode(MODE_0_2D);
