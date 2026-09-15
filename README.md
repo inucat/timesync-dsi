@@ -2,25 +2,49 @@
 
 NTP Time synchronization tool for Nintendo DSi
 
-## NOTICE
+## Requirement
 
-As of 2024-11-22, this program is not compatible with libnds v2.0.0 and later.
-Migration is in progress.
+- devkitARM
+  - Get started by reading [official guide](https://devkitpro.org/wiki/Getting_Started)
 
-## Before build, specify your timezone
+## Usage
 
-**Please change the offset for your timezone BEFORE BUILDING**.
-Open `./arm9/source/offset.h` and change the value.
+**CHANGE the offset for your timezone THEN BUILD**.
+
+The default offset is JST.
+You must modify and build if you live outside Japan.
+
+Open `arm9/source/main.c` and locate the line like below:
 
 ```c
-#define TIMEZONE_OFFSET (9 * 3600) // seconds
+#define OFFSET_SECONDS 9 * 60 * 60 // JST offset in seconds
 ```
 
-## How to use
+Then, change the value for your location.
 
-You may need to setup Docker and Docker Compose before building.
+As you might notice, the server address and port are also configurable.
 
-1. Clone the repo
-2. In the repo, run `docker compose run make`
-3. Copy `work.nds` to the SD card
-4. Run it on the console
+## Memorandum
+
+How to set up VSCode C/C++ Extension IntelliSense:
+
+1. Run `bear -- make`
+2. Create `.vscode/c_cpp_properties.json`
+3. Write something like _JSON below_
+   - The `"compileCommands"` line seems important
+4. Will be OK
+
+```json
+{
+  "configurations": [
+    {
+      "name": "Linux",
+      "includePath": ["${workspaceFolder}/**"],
+      "compileCommands": ["${workspaceFolder}/compile_commands.json"],
+      "defines": ["__NDS__"],
+      "compilerPath": "/opt/devkitpro/devkitARM/bin/arm-none-eabi-gcc"
+    }
+  ],
+  "version": 4
+}
+```

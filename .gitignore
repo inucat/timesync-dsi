@@ -1,5 +1,6 @@
 *.elf
 *.nds
 build/
-.DS_Store
-examples/
+
+.vscode/
+compile_commands.json
