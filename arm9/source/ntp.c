@@ -20,24 +20,36 @@
  * along with Timesync DSi.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <netinet/in.h>
-
 #include "ntp.h"
 
-int ntp_request_sync(int sockfd, struct sockaddr *addr) {
+#include <netinet/in.h>
+#include <sys/socket.h>
+
+int
+ntp_send_request(int sockfd, const struct sockaddr* addr)
+{
     struct ntp_packet packet;
     memset(&packet, 0, sizeof(packet));
     packet.li_vn_mode = VN_NTP_V3 | MODE_CLIENT;
 
-    return sendto(sockfd, (char *)&packet, sizeof(packet), 0, addr,
-                  sizeof(struct sockaddr));
+    return sendto(
+      sockfd, (char*)&packet, sizeof(packet), 0, addr, sizeof(struct sockaddr));
 }
 
-int ntp_recv_packet(int sockfd, struct sockaddr *addr,
-                    struct ntp_packet *packet) {
+int
+ntp_receive_response(int sockfd,
+                     struct sockaddr* addr,
+                     struct ntp_packet* packet)
+{
     memset(packet, 0, sizeof(struct ntp_packet));
-    int addr_len = sizeof(struct sockaddr);
+    socklen_t addr_len = sizeof(struct sockaddr);
 
-    return recvfrom(sockfd, packet, sizeof(struct ntp_packet), 0, addr,
-                    &addr_len);
+    return recvfrom(
+      sockfd, packet, sizeof(struct ntp_packet), 0, addr, &addr_len);
+}
+
+time_t
+ntp_time_to_unix_time(u64 ntp_timestamp, s64 offset_seconds)
+{
+    return (time_t)(ntohl(ntp_timestamp) - NTP_UNIX_DELTA + offset_seconds);
 }

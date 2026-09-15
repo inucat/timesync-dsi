@@ -1,73 +1,152 @@
-/**
- * @copyright GNU Public License.
- *
- * Timesync DSi - Synchronize your DSi clock with NTP
- * Copyright (C) 2024  inucat
- *
- * This file is part of Timesync DSi.
- *
- * Timesync DSi is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Timesync DSi is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Timesync DSi.  If not, see <https://www.gnu.org/licenses/>.
- */
+/*---------------------------------------------------------------------------------
 
-#include "nds/arm7/clock.h"
-#include "nds/arm7/serial.h"
-#include "nds/fifocommon.h"
-#include "nds/system.h"
-#include <dswifi7.h>
+        default ARM7 core
+
+                Copyright (C) 2005 - 2010
+                Michael Noland (joat)
+                Jason Rogers (dovoto)
+                Dave Murphy (WinterMute)
+
+        This software is provided 'as-is', without any express or implied
+        warranty.  In no event will the authors be held liable for any
+        damages arising from the use of this software.
+
+        Permission is granted to anyone to use this software for any
+        purpose, including commercial applications, and to alter it and
+        redistribute it freely, subject to the following restrictions:
+
+        1.	The origin of this software must not be misrepresented; you
+                must not claim that you wrote the original software. If you use
+                this software in a product, an acknowledgment in the product
+                documentation would be appreciated but is not required.
+
+        2.	Altered source versions must be plainly marked as such, and
+                must not be misrepresented as being the original software.
+
+        3.	This notice may not be removed or altered from any source
+                distribution.
+
+---------------------------------------------------------------------------------*/
 #include <nds.h>
-#include <stdbool.h>
 
+#include <calico.h>
+#include <string.h>
 
-#define FIFO_TO_7 FIFO_USER_01
-#define FIFO_TO_9 FIFO_USER_02
+// Management structure and stack space for PXI server thread
+static Thread s_myServerThread;
+alignas(8) static u8 s_myServerThreadStack[1024];
 
-volatile bool finished = false;
-
-void
-onVblankIrq(void)
+/**
+ * @brief Converts an integer value to binary-coded decimal (BCD) format.
+ * @param value The integer value to convert. Wrapped to the range 0-99 if
+ * necessary.
+ * @return The BCD representation of the value.
+ * @note RTC uses BCD format for date and time.
+ */
+static int
+to_bcd(int value)
 {
-    Wifi_Update();
+    value = value % 100;
+    return ((value / 10) << 4) | (value % 10);
+}
+
+static int
+pxiThreadMain(void* arg)
+{
+    // Set up PXI mailbox, used to receive PXI command words
+    Mailbox mb;
+    u32 mb_slots[1] = { 0 };
+    mailboxPrepare(&mb, mb_slots, 1);
+    pxiSetMailbox(PxiChannel_User0, &mb);
+
+    RtcDateTime network_time;
+
+    // Main PXI message loop
+    for (int i = 0;; ++i) {
+        // Receive a message
+        u32 msg = mailboxRecv(&mb);
+        switch (i) {
+            case 0:
+                network_time.year = to_bcd(msg);
+                break;
+            case 1:
+                network_time.month = to_bcd(msg);
+                break;
+            case 2:
+                network_time.day = to_bcd(msg);
+                break;
+            case 3:
+                network_time.weekday = to_bcd(msg);
+                break;
+            case 4:
+                network_time.hour = to_bcd(msg);
+                break;
+            case 5:
+                network_time.minute = to_bcd(msg);
+                break;
+            case 6:
+                network_time.second = to_bcd(msg);
+                rtcWriteRegister(
+                  RtcReg_DateTime, &network_time, sizeof(RtcDateTime));
+                break;
+        }
+
+        // Send a reply back to the ARM9
+        pxiReply(PxiChannel_User0, i);
+    }
+
+    return 0;
 }
 
 int
 main()
 {
-    irqInit();
-    fifoInit();
-    installWifiFIFO();
+    // Read settings from NVRAM
+    envReadNvramSettings();
 
-    irqSet(IRQ_VBLANK, onVblankIrq);
-    irqEnable(IRQ_VBLANK | IRQ_VCOUNT | IRQ_NETWORK);
+    // Set up extended keypad server (X/Y/hinge)
+    keypadStartExtServer();
 
-    RTCtime rtc_now;
+    // Configure and enable VBlank interrupt
+    lcdSetIrqMask(DISPSTAT_IE_ALL, DISPSTAT_IE_VBLANK);
+    irqEnable(IRQ_VBLANK);
 
-    rtcGetTimeAndDate((uint8*)&rtc_now);
-    fifoSendDatamsg(FIFO_TO_9, sizeof(RTCtime), (uint8*)&rtc_now);
+    // Set up RTC
+    rtcInit();
+    rtcSyncTime();
 
-    while (true) {
-        if (!finished && fifoCheckDatamsg(FIFO_TO_7)) {
-            finished = true;
+    // Initialize power management
+    pmInit();
 
-            if ((fifoCheckDatamsgLength(FIFO_TO_7)) != sizeof(RTCtime)) {
-                fifoSendValue32(FIFO_TO_9, -1);
-            }
+    // Set up block device peripherals
+    blkInit();
 
-            RTCtime rtc;
-            fifoGetDatamsg(FIFO_TO_7, sizeof(RTCtime), (uint8*)&rtc);
-            rtcSetTimeAndDate((uint8*)&rtc);
-            fifoSendValue32(FIFO_TO_9, 0);
-        }
-        swiWaitForVBlank();
+    // Set up touch screen driver
+    touchInit();
+    touchStartServer(80, MAIN_THREAD_PRIO);
+
+    // Set up sound and mic driver
+    soundStartServer(MAIN_THREAD_PRIO - 0x10);
+    micStartServer(MAIN_THREAD_PRIO - 0x18);
+
+    // Set up wireless manager
+    wlmgrStartServer(MAIN_THREAD_PRIO - 8);
+
+    // Set up Maxmod
+    // mmInstall(MAIN_THREAD_PRIO + 1);
+
+    // Set up server thread
+    threadPrepare(&s_myServerThread,
+                  pxiThreadMain,
+                  NULL,
+                  &s_myServerThreadStack[sizeof(s_myServerThreadStack)],
+                  MAIN_THREAD_PRIO);
+    threadStart(&s_myServerThread);
+
+    // Keep the ARM7 mostly idle
+    while (pmMainLoop()) {
+        threadWaitForVBlank();
     }
+
+    return 0;
 }

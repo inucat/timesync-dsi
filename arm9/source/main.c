@@ -20,178 +20,99 @@
  * along with Timesync DSi.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "offset.h"
-
 #include <nds.h>
 
 #include <dswifi9.h>
+#include <nds/interrupts.h>
+#include <nds/ndstypes.h>
+#include <nds/system.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 
-#include "nds/fifocommon.h"
-#include "nds/interrupts.h"
-#include "nds/ndstypes.h"
-#include "nds/system.h"
+#include "network.h"
 #include "ntp.h"
-#include "time.h"
+#include "rtc.h"
+#include "time_conversion.h"
 
-#define NTP_SERVER "ntp.nict.jp"
-#define FIFO_TO_7  FIFO_USER_01
-#define FIFO_TO_9  FIFO_USER_02
+#define NTP_SERVER     "ntp.nict.jp"
+#define NTP_PORT       123
+#define OFFSET_SECONDS 9 * 60 * 60 // JST offset in seconds
 
-// Prepare the RTC register values
-// Note: RTC uses binary-coded decimal (BCD) format for time
-// Convert decimal to BCD
-#define DEC_TO_BCD(x) (((x) / 10) << 4) | ((x) % 10)
-
-static void
-print_time_info(time_t time)
+void
+debug_conversion(u32* rtc_time)
 {
-    iprintf(" timestamp: %lld\n", time);
-    iprintf(" formatted: %s\n", ctime(&time));
-}
-
-static void
-compose_rtctime(RTCtime* rtctime,
-                uint16 year,
-                uint8 mon,
-                uint8 day,
-                uint8 wday,
-                uint8 hour,
-                uint8 min,
-                uint8 sec)
-{
-    rtctime->year = DEC_TO_BCD(year % 100);
-    rtctime->month = DEC_TO_BCD(mon);
-    rtctime->day = DEC_TO_BCD(day);
-    rtctime->weekday = DEC_TO_BCD(wday);
-    rtctime->hours = DEC_TO_BCD(hour);
-    rtctime->minutes = DEC_TO_BCD(min);
-    rtctime->seconds = DEC_TO_BCD(sec);
-}
-
-static void
-unix_to_rtc(int64 unix_time, RTCtime* rtc_time)
-{
-    struct tm* tm_data = gmtime(&unix_time);
-
-    printf("struct tm: %04d-%02d-%02d %d %2d:%02d:%02d\n",
-           tm_data->tm_year,
-           tm_data->tm_mon,
-           tm_data->tm_mday,
-           tm_data->tm_wday,
-           tm_data->tm_hour,
-           tm_data->tm_min,
-           tm_data->tm_sec);
-
-    compose_rtctime(rtc_time,
-                    tm_data->tm_year,
-                    tm_data->tm_mon + 1,
-                    tm_data->tm_mday,
-                    tm_data->tm_wday,
-                    tm_data->tm_hour,
-                    tm_data->tm_min,
-                    tm_data->tm_sec);
-
-    printf("RTCTime: %04d-%02d-%02d %d %2d:%02d:%02d\n",
-           rtc_time->year,
-           rtc_time->month,
-           rtc_time->day,
-           rtc_time->weekday,
-           rtc_time->hours,
-           rtc_time->minutes,
-           rtc_time->seconds);
+    iprintf(
+      "Converted Date/Time: %04ld-%02ld-%02ld (%01ld) %02ld:%02ld:%02ld\n",
+      rtc_time[0],
+      rtc_time[1],
+      rtc_time[2],
+      rtc_time[3],
+      rtc_time[4],
+      rtc_time[5],
+      rtc_time[6]);
 }
 
 int
 main(void)
 {
-    RTCtime rtc_time;
+    u32 rtc_time[7] = { 0 };
 
     consoleDemoInit();
     iprintf("= Timesync DSi =\n");
-    while (1) {
-        if (fifoCheckDatamsg(FIFO_TO_9)) {
-            fifoGetDatamsg(FIFO_TO_9, sizeof(RTCtime), (uint8*)&rtc_time);
-            printf("RTCTime: %04d-%02d-%02d %d %2d:%02d:%02d\n",
-                   rtc_time.year,
-                   rtc_time.month,
-                   rtc_time.day,
-                   rtc_time.weekday,
-                   rtc_time.hours,
-                   rtc_time.minutes,
-                   rtc_time.seconds);
-            break;
-        }
-        swiWaitForVBlank();
-    }
-
-    // iprintf("Current time on DSi:\n");
-    // print_time_info(time(NULL));
 
     iprintf("Waking up Wifi.\n");
-    if (!Wifi_InitDefault(WFC_CONNECT)) {
+    if (!Wifi_InitDefault(true)) {
         iprintf("Wifi_InitDefault: Failed\n");
         goto main_loop;
     }
 
-    iprintf("Creating socket.\n");
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        iprintf("socket: Failed\n");
-        goto main_loop;
-    }
-
-    iprintf("Resolving server address.\n");
-    struct hostent* host = gethostbyname(NTP_SERVER);
-    if (!host) {
-        iprintf("gethostbyname: Failed\n");
-        goto main_loop;
-    }
-
-    // Prepare address info
+    int sockfd;
     struct sockaddr_in host_addr;
-    memset(&host_addr, 0, sizeof(host_addr));
-    host_addr.sin_family = AF_INET;
-    host_addr.sin_port = htons(NTP_PORT);
-    memcpy(&host_addr.sin_addr.s_addr, host->h_addr_list[0], host->h_length);
+    iprintf("Resolving NTP server address...\n");
+    if (init_endpoint(NTP_SERVER, NTP_PORT, &sockfd, &host_addr) < 0) {
+        iprintf("init_endpoint: Failed\n");
+        goto main_loop;
+    }
 
-    if (ntp_request_sync(sockfd, (struct sockaddr*)&host_addr) < 0) {
+    iprintf("Sending NTP request to %s...\n", NTP_SERVER);
+    if (ntp_send_request(sockfd, (struct sockaddr*)&host_addr) < 0) {
         iprintf("ntp_request_sync: Failed\n");
         goto main_loop;
     }
 
+    iprintf("Waiting for NTP response...\n");
     struct ntp_packet packet;
-    if (ntp_recv_packet(sockfd, (struct sockaddr*)&host_addr, &packet) < 0) {
+    if (ntp_receive_response(sockfd, (struct sockaddr*)&host_addr, &packet) <
+        0) {
         iprintf("ntp_recv_packet: Failed\n");
         goto main_loop;
     }
 
-    // Convert the transmit timestamp to Unix time
-    int64 unix_time =
-      ntohl(packet.tx_tm_s) - NTP_TIMESTAMP_DELTA + TIMEZONE_OFFSET;
-    print_time_info(unix_time);
-    unix_to_rtc(unix_time, &rtc_time);
+    iprintf("NTP response received.\n");
+    u64 unix_time = ntp_time_to_unix_time(packet.tx_tm_s, OFFSET_SECONDS);
+    if (unix_to_rtc_words(unix_time, rtc_time) < 0) {
+        iprintf("unix_to_rtc_words: Failed\n");
+        goto main_loop;
+    }
+    debug_conversion(rtc_time);
 
-    iprintf("Sending RTCData to ARM7\n");
-    if (!fifoSendDatamsg(FIFO_TO_7, sizeof(RTCtime), (void*)&rtc_time)) {
-        iprintf("fifoSendDatamsg: Failed\n");
+    iprintf("Sending RTC time to ARM7\n");
+    if (set_rtc_time_via_arm7(
+          PxiChannel_User0, rtc_time, sizeof(rtc_time) / sizeof(u32)) < 0) {
+        iprintf("RTC time send failed.\n");
+        goto main_loop;
     }
 
-main_loop:
-    while (1) {
-        if (fifoCheckValue32(FIFO_TO_9)) {
-            int result = fifoGetValue32(FIFO_TO_9);
-            if (result == 0) {
-                iprintf("Successfully synced!\n");
-            } else {
-                iprintf("Failed to sync!\n");
-            }
-            iprintf("Press START to exit\n");
-        }
-        swiWaitForVBlank();
+    iprintf("RTC time sent successfully.\n");
 
+main_loop:
+    iprintf("Press START to exit\n");
+    while (1) {
+        swiWaitForVBlank();
+        scanKeys();
         int keys = keysDown();
         if (keys & KEY_START)
             break;

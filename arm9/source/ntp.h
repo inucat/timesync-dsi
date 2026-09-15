@@ -25,10 +25,13 @@
 
 #include <nds.h>
 
-#define NTP_PORT            123
-#define NTP_TIMESTAMP_DELTA 2208988800ull // 1900 to 1970 in seconds
+#include <netinet/in.h>
+#include <sys/socket.h>
 
-struct ntp_packet {
+#define NTP_UNIX_DELTA 2208988800ull // 1900 to 1970 in seconds
+
+struct ntp_packet
+{
     uint8_t li_vn_mode;
     uint8_t stratum;
     uint8_t poll;
@@ -46,22 +49,22 @@ struct ntp_packet {
     uint32_t tx_tm_f;
 };
 
-#define LI_NO_WARNING  0b00000000
-#define LI_LAST_MIN_61 0b01000000
-#define LI_LAST_MIN_59 0b10000000
-#define LI_UNKNOWN     0b11000000
+// #define LI_NO_WARNING  0b00000000
+// #define LI_LAST_MIN_61 0b01000000
+// #define LI_LAST_MIN_59 0b10000000
+// #define LI_UNKNOWN     0b11000000
 
 #define VN_NTP_V3 0b00011000
 #define VN_NTP_V4 0b00100000
 
-#define MODE_RESERVED  0b00000000
-#define MODE_SYM_ACTI  0b00000001
-#define MODE_SYM_PASS  0b00000010
-#define MODE_CLIENT    0b00000011
-#define MODE_SERVER    0b00000100
-#define MODE_BROADCAST 0b00000101
-#define MODE_NTP_CTRL  0b00000110
-#define MODE_PRIVATE   0b00000111
+// #define MODE_RESERVED  0b00000000
+// #define MODE_SYM_ACTI  0b00000001
+// #define MODE_SYM_PASS  0b00000010
+#define MODE_CLIENT 0b00000011
+// #define MODE_SERVER    0b00000100
+// #define MODE_BROADCAST 0b00000101
+// #define MODE_NTP_CTRL  0b00000110
+// #define MODE_PRIVATE   0b00000111
 
 /**
  * @brief Sends an NTP packet via `sockfd` to the `addr`.
@@ -70,7 +73,8 @@ struct ntp_packet {
  * @param addr Address data of the NTP server.
  * @return Succeeded: >= 0; Failed: < 0
  */
-extern int ntp_request_sync(int sockfd, struct sockaddr *addr);
+int
+ntp_send_request(int sockfd, const struct sockaddr* addr);
 
 /**
  * @brief Receives an NTP packet via `sockfd` from the `addr`.
@@ -80,7 +84,20 @@ extern int ntp_request_sync(int sockfd, struct sockaddr *addr);
  * @param packet Pointer to store received NTP packet.
  * @return Succeeded: >= 0; Failed: < 0
  */
-extern int ntp_recv_packet(int sockfd, struct sockaddr *addr,
-                           struct ntp_packet *packet);
+int
+ntp_receive_response(int sockfd,
+                     struct sockaddr* addr,
+                     struct ntp_packet* packet);
+
+/**
+ * @brief Converts an NTP timestamp to a Unix timestamp.
+ *
+ * @param ntp_timestamp The NTP timestamp (in network byte order) to convert.
+ * @param offset_seconds The offset in seconds to apply to the converted Unix
+ * timestamp.
+ * @return The corresponding Unix timestamp.
+ */
+time_t
+ntp_time_to_unix_time(u64 ntp_timestamp, s64 offset_seconds);
 
 #endif // _NTP_H_
