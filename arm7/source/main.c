@@ -30,37 +30,69 @@
 #include <nds.h>
 
 #include <calico.h>
-#include <maxmod7.h>
 #include <string.h>
 
 // Management structure and stack space for PXI server thread
 static Thread s_myServerThread;
 alignas(8) static u8 s_myServerThreadStack[1024];
 
+/**
+ * @brief Converts an integer value to binary-coded decimal (BCD) format.
+ * @param value The integer value to convert. Wrapped to the range 0-99 if
+ * necessary.
+ * @return The BCD representation of the value.
+ * @note RTC uses BCD format for date and time.
+ */
+static int
+to_bcd(int value)
+{
+    value = value % 100;
+    return ((value / 10) << 4) | (value % 10);
+}
+
 static int
 pxiThreadMain(void* arg)
 {
     // Set up PXI mailbox, used to receive PXI command words
     Mailbox mb;
-    u32 mb_slots[sizeof(RtcDateTime)] = { 0 };
-    mailboxPrepare(&mb, mb_slots, sizeof(mb_slots) / sizeof(u32));
+    u32 mb_slots[1] = { 0 };
+    mailboxPrepare(&mb, mb_slots, 1);
     pxiSetMailbox(PxiChannel_User0, &mb);
 
-    RtcDateTime network_time; // = (RtcDateTime*)mb_slots;
+    RtcDateTime network_time;
 
     // Main PXI message loop
     for (int i = 0;; ++i) {
         // Receive a message
         u32 msg = mailboxRecv(&mb);
-        // -------------------------------------------------------------------------
-        ((u8*)&network_time)[i] = msg;
-        if (i == sizeof(network_time) - 1) {
-            rtcWriteRegister(
-              RtcReg_DateTime, &network_time, sizeof(RtcDateTime));
+        switch (i) {
+            case 0:
+                network_time.year = to_bcd(msg);
+                break;
+            case 1:
+                network_time.month = to_bcd(msg);
+                break;
+            case 2:
+                network_time.day = to_bcd(msg);
+                break;
+            case 3:
+                network_time.weekday = to_bcd(msg);
+                break;
+            case 4:
+                network_time.hour = to_bcd(msg);
+                break;
+            case 5:
+                network_time.minute = to_bcd(msg);
+                break;
+            case 6:
+                network_time.second = to_bcd(msg);
+                rtcWriteRegister(
+                  RtcReg_DateTime, &network_time, sizeof(RtcDateTime));
+                break;
         }
+
         // Send a reply back to the ARM9
         pxiReply(PxiChannel_User0, i);
-        // -------------------------------------------------------------------------
     }
 
     return 0;

@@ -25,8 +25,10 @@
 
 #include <nds.h>
 
-#define NTP_PORT            123
-#define NTP_TIMESTAMP_DELTA 2208988800ull // 1900 to 1970 in seconds
+#include <netinet/in.h>
+#include <sys/socket.h>
+
+#define NTP_UNIX_DELTA 2208988800ull // 1900 to 1970 in seconds
 
 struct ntp_packet
 {
@@ -71,8 +73,8 @@ struct ntp_packet
  * @param addr Address data of the NTP server.
  * @return Succeeded: >= 0; Failed: < 0
  */
-extern int
-ntp_send_request(int sockfd, struct sockaddr* addr);
+int
+ntp_send_request(int sockfd, const struct sockaddr* addr);
 
 /**
  * @brief Receives an NTP packet via `sockfd` from the `addr`.
@@ -82,9 +84,20 @@ ntp_send_request(int sockfd, struct sockaddr* addr);
  * @param packet Pointer to store received NTP packet.
  * @return Succeeded: >= 0; Failed: < 0
  */
-extern int
+int
 ntp_receive_response(int sockfd,
                      struct sockaddr* addr,
                      struct ntp_packet* packet);
+
+/**
+ * @brief Converts an NTP timestamp to a Unix timestamp.
+ *
+ * @param ntp_timestamp The NTP timestamp (in network byte order) to convert.
+ * @param offset_seconds The offset in seconds to apply to the converted Unix
+ * timestamp.
+ * @return The corresponding Unix timestamp.
+ */
+time_t
+ntp_time_to_unix_time(u64 ntp_timestamp, s64 offset_seconds);
 
 #endif // _NTP_H_

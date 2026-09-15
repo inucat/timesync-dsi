@@ -20,13 +20,13 @@
  * along with Timesync DSi.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "ntp.h"
+
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-#include "ntp.h"
-
 int
-ntp_send_request(int sockfd, struct sockaddr* addr)
+ntp_send_request(int sockfd, const struct sockaddr* addr)
 {
     struct ntp_packet packet;
     memset(&packet, 0, sizeof(packet));
@@ -46,4 +46,10 @@ ntp_receive_response(int sockfd,
 
     return recvfrom(
       sockfd, packet, sizeof(struct ntp_packet), 0, addr, &addr_len);
+}
+
+time_t
+ntp_time_to_unix_time(u64 ntp_timestamp, s64 offset_seconds)
+{
+    return (time_t)(ntohl(ntp_timestamp) - NTP_UNIX_DELTA + offset_seconds);
 }
