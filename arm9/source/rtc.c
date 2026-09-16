@@ -13,8 +13,7 @@ set_rtc_time_via_arm7(enum PxiChannel channel,
 
     pxiWaitRemote(channel);
     for (int i = 0; i < word_count; ++i) {
-        u8 byte = (u8)(rtc_words)[i];
-        u32 retval = pxiSendAndReceive(channel, byte);
+        u32 retval = pxiSendAndReceive(channel, rtc_words[i]);
         if (retval != i) {
             return -1;
         }
