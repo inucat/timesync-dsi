@@ -36,10 +36,7 @@
 #include "ntp.h"
 #include "rtc.h"
 #include "time_conversion.h"
-
-#define NTP_SERVER     "ntp.nict.jp"
-#define NTP_PORT       123
-#define OFFSET_SECONDS 9 * 60 * 60 // JST offset in seconds
+#include "conf.h"
 
 void
 debug_conversion(u32* rtc_time)
@@ -69,15 +66,23 @@ main(void)
         goto main_loop;
     }
 
+    struct config conf;
+    if (load_conf(&conf) < 0)
+    {
+        iprintf("load_conf: Failed, using default config\n");
+    }
+    iprintf("%s, %d, %d\n", conf.ntp_server, conf.ntp_port, conf.offset_minutes);
+
     int sockfd;
     struct sockaddr_in host_addr;
     iprintf("Resolving NTP server address...\n");
-    if (init_endpoint(NTP_SERVER, NTP_PORT, &sockfd, &host_addr) < 0) {
+    if (init_endpoint(conf.ntp_server, conf.ntp_port, &sockfd, &host_addr) < 0)
+    {
         iprintf("init_endpoint: Failed\n");
         goto main_loop;
     }
 
-    iprintf("Sending NTP request to %s...\n", NTP_SERVER);
+    iprintf("Sending NTP request to %s...\n", conf.ntp_server);
     if (ntp_send_request(sockfd, (struct sockaddr*)&host_addr) < 0) {
         iprintf("ntp_request_sync: Failed\n");
         goto main_loop;
@@ -92,8 +97,9 @@ main(void)
     }
 
     iprintf("NTP response received.\n");
-    u64 unix_time = ntp_time_to_unix_time(packet.tx_tm_s, OFFSET_SECONDS);
-    if (unix_to_rtc_words(unix_time, rtc_time) < 0) {
+    u64 unix_time = ntp_time_to_unix_time(packet.tx_tm_s, conf.offset_minutes * 60);
+    if (unix_to_rtc_words(unix_time, rtc_time) < 0)
+    {
         iprintf("unix_to_rtc_words: Failed\n");
         goto main_loop;
     }
