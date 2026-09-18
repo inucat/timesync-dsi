@@ -11,7 +11,7 @@ struct config
 /**
  * Loads the configuration from a file into the provided struct.
  * @param conf Pointer to the configuration struct to be populated.
- * @return 0 on success, -1 on failure.
+ * @return 0 on success, negative values on failure.
  */
 int load_conf(struct config *conf);
 
