@@ -9,20 +9,23 @@ NTP Time synchronization tool for Nintendo DSi
 
 ## Usage
 
-**CHANGE the offset for your timezone THEN BUILD**.
+1. Get the NDS file from [Release page](https://github.com/inucat/timesync-dsi/releases).
+2. Put a config file `timesync-dsi.conf` in the root of your SD card.
+3. Write values for your location in it (See example below).
 
-The default offset is JST.
-You must modify and build if you live outside Japan.
+## Example config
 
-Open `arm9/source/main.c` and locate the line like below:
-
-```c
-#define OFFSET_SECONDS 9 * 60 * 60 // JST offset in seconds
+```
+server=time.google.com
+port=123
+offset_minutes=0
 ```
 
-Then, change the value for your location.
+- `server` is NTP server address. Max 255 length.
+- `port` is NTP server port.
+- `offset_minutes` is UTC offset for your timezone as signed integer.
 
-As you might notice, the server address and port are also configurable.
+Omit any lines and the default values will be used.
 
 ## Memorandum
 
