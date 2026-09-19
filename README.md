@@ -2,7 +2,7 @@
 
 NTP Time synchronization tool for Nintendo DSi
 
-## Requirement
+## Build Requirement
 
 - devkitARM
   - Get started by reading [official guide](https://devkitpro.org/wiki/Getting_Started)
@@ -31,10 +31,10 @@ Omit any lines and the default values will be used.
 
 How to set up VSCode C/C++ Extension IntelliSense:
 
-1. Run `bear -- make`
+1. Run `bear -- make` or `compiledb make`
 2. Create `.vscode/c_cpp_properties.json`
 3. Write something like _JSON below_
-   - The `"compileCommands"` line seems important
+   - The `"compileCommands"` and `"compilerPath"` are important
 4. Will be OK
 
 ```json
@@ -44,7 +44,6 @@ How to set up VSCode C/C++ Extension IntelliSense:
       "name": "Linux",
       "includePath": ["${workspaceFolder}/**"],
       "compileCommands": ["${workspaceFolder}/compile_commands.json"],
-      "defines": ["__NDS__"],
       "compilerPath": "/opt/devkitpro/devkitARM/bin/arm-none-eabi-gcc"
     }
   ],
